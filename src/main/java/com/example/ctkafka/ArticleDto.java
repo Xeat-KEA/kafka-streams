@@ -12,4 +12,5 @@ public class ArticleDto {
     private Integer like_count;
     private Integer reply_count;
     private Integer view_count;
+    private Boolean __deleted;
 }

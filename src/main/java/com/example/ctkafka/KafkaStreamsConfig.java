@@ -2,8 +2,6 @@ package com.example.ctkafka;
 
 import java.util.Properties;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.apache.kafka.common.serialization.Serdes;
@@ -13,7 +11,6 @@ import org.apache.kafka.streams.StreamsBuilder;
 import org.apache.kafka.streams.StreamsConfig;
 import org.apache.kafka.streams.errors.LogAndContinueExceptionHandler;
 import org.apache.kafka.streams.kstream.*;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -29,13 +26,14 @@ import org.springframework.kafka.support.serializer.JsonSerializer;
 @RequiredArgsConstructor
 public class KafkaStreamsConfig {
     public final ObjectMapper objectMapper;
-    public static String USER_TOPIC = "b.userService.users";
-    public static String BLOG_TOPIC = "b.blogService.blog";
-    public static String ARTICLE_TOPIC = "b.blogService.article";
-    public static String CODE_ARTICLE_TOPIC = "b.blogService.code_article";
+    public static String USER_TOPIC = "ct.user_service.users";
+    public static String BLOG_TOPIC = "ct.blog_service.blog";
+    public static String ARTICLE_TOPIC = "ct.blog_service.article";
+    public static String CODE_ARTICLE_TOPIC = "ct.blog_service.code_article";
     public static String JOINED_TOPIC = "article";
+    public static String ELASTIC_USER_TOPIC = "user";
     public String BOOTSTRAP_SERVERS = "localhost:9092";
-    public String APPLICATION_ID = "ctKafka";
+    public String APPLICATION_ID = "ctKafka2";
 
     @Bean
     public KafkaStreams initBoardDetailStream() {
@@ -46,10 +44,7 @@ public class KafkaStreamsConfig {
         // 문자열 데이터를 직렬화하고 역직렬화
         props.put(StreamsConfig.DEFAULT_KEY_SERDE_CLASS_CONFIG, Serdes.String().getClass());
         props.put(StreamsConfig.DEFAULT_VALUE_SERDE_CLASS_CONFIG, Serdes.String().getClass());
-        props.put(
-                StreamsConfig.DEFAULT_DESERIALIZATION_EXCEPTION_HANDLER_CLASS_CONFIG,
-                LogAndContinueExceptionHandler.class
-        );
+        props.put(StreamsConfig.DEFAULT_DESERIALIZATION_EXCEPTION_HANDLER_CLASS_CONFIG, LogAndContinueExceptionHandler.class);
 
         // Kafka Streams의 토폴로지를 정의하는 객체
         StreamsBuilder builder = new StreamsBuilder();
@@ -94,7 +89,7 @@ public class KafkaStreamsConfig {
                 // blog stream과 user table을 user_id 키 값으로 조인
                 .selectKey((key, value) -> {
                     log.info("셀렉트키들어옴");
-                    return "{\"user_id\":" + value.getUser_id().toString() + "}";
+                    return "{\"user_id\":\"" + value.getUser_id() + "\"}";
                 }).peek((key, value) -> log.info("키={}", key))
                 .join(userKtable, (blogStreamValue, userTableValue) -> {
                     log.info("조인들어옴");
@@ -150,7 +145,9 @@ public class KafkaStreamsConfig {
             return "{\"blog_id\":" + value.getBlog_id().toString() + "}";
         })).join(userblogJoin, (articleValue, userblogJoinValue) -> {
             log.info("아티클조인들어옴");
-            if (articleValue.getBlog_id() == userblogJoinValue.getBlog_id().intValue()) {
+            if (articleValue.get__deleted()) {
+                return new ElasticArticleDto(articleValue.getArticle_id());
+            } else if (articleValue.getBlog_id() == userblogJoinValue.getBlog_id().intValue()) {
                 log.info("아티클이프들어옴");
                 log.info(articleValue.toString());
                 log.info(userblogJoinValue.toString());
@@ -161,14 +158,14 @@ public class KafkaStreamsConfig {
                 log.info("아티클엘스로옴");
                 return null;
             }
-        }).selectKey(((key, value) -> {
+        }).map(((key, value) -> {
             log.info("엘라아티클 셀렉트키 들어옴");
-            log.info("바꾸기전 키={}",key);
-            return "{\"id\":" + value.getArticle_id().toString() + "}";
-        })).peek((key, value) -> {
-            log.info("키={}",key);
-            log.info("프로듀서로옴");
-        }).to(
+            log.info("바꾸기전 키={}", key);
+            if (value.getNickname() == null && value.getTitle() == null) {
+                return new KeyValue<>("{\"id\":" + value.getArticle_id().toString() + "}", null);
+            }
+            return new KeyValue<>("{\"id\":" + value.getArticle_id().toString() + "}", value);
+        })).to(
                 JOINED_TOPIC,
                 Produced.with(
                         Serdes.String(),
@@ -183,23 +180,20 @@ public class KafkaStreamsConfig {
         // 스트림 토픽에서 문자열 데이터를 읽어서 KStream으로 변환
         KStream<String, CodeArticleDto> codeArticleKstream = builder.stream(
                 CODE_ARTICLE_TOPIC,
-                Consumed.with(
-                        Serdes.String(),
-                        Serdes.serdeFrom(new JsonSerializer<>(), codeArticleDtoJsonDeserializer)
-                )
-        );
+                Consumed.with(Serdes.String(), Serdes.serdeFrom(new JsonSerializer<>(), codeArticleDtoJsonDeserializer)));
         codeArticleKstream.peek((key, value) -> {
             log.info("코드아티클 키={}", key);
             log.info(value.toString());
         }).selectKey(((key, value) -> {
             log.info("코드아티클 셀렉트키 들어옴");
+            if (value.getArticle_id() == null) {
+                return "{\"id\":" + 1 + "}";
+            }
             return "{\"id\":" + value.getArticle_id().toString() + "}";
-        })).to(JOINED_TOPIC,
-                Produced.with(
-                        Serdes.String(),
-                        new JsonSerde<>(CodeArticleDto.class)
-                )
-        );
+        })).to(JOINED_TOPIC, Produced.with(Serdes.String(), new JsonSerde<>(CodeArticleDto.class)));
+
+        userKtable.toStream().selectKey((key, value) -> "{\"id\":\"" + value.getUser_id() + "\"}")
+                .to(ELASTIC_USER_TOPIC, Produced.with(Serdes.String(), new JsonSerde<>(UserDto.class)));
 
         // 토폴로지를 빌드하여 Kafka Streams 객체 생성
         //3. 스트림즈 생성

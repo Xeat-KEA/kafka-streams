@@ -28,9 +28,20 @@ public class ElasticArticleDto {
         this.title = title;
         this.content = content;
         this.created_date = Instant.ofEpochMilli(created_date/1000).atZone(ZoneId.of("UTC")).toLocalDateTime().toString();
-        log.info(this.created_date.toString());
         this.like_count = like_count;
         this.reply_count = reply_count;
         this.view_count = view_count;
+    }
+
+    public ElasticArticleDto(Integer article_id) {
+        this.article_id = article_id;
+        this.nickname = null;
+        this.profile_url = null;
+        this.title = null;
+        this.content = null;
+        this.created_date = null;
+        this.like_count = null;
+        this.reply_count = null;
+        this.view_count = null;
     }
 }
