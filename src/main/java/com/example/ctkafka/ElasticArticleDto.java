@@ -10,7 +10,7 @@ import java.time.ZoneId;
 @Slf4j
 public class ElasticArticleDto {
     private Integer article_id;
-    private String nickname;
+    private String nick_name;
     private String profile_url;
     private String title;
     private String content;
@@ -19,10 +19,10 @@ public class ElasticArticleDto {
     private Integer reply_count;
     private Integer view_count;
 
-    public ElasticArticleDto(Integer article_id, String nickname, String profile_url, String title,
+    public ElasticArticleDto(Integer article_id, String nick_name, String profile_url, String title,
                              String content, Long created_date, Integer like_count, Integer reply_count, Integer view_count) {
         this.article_id = article_id;
-        this.nickname = nickname;
+        this.nick_name = nick_name;
         this.profile_url = profile_url;
         this.title = title;
         this.content = content;
@@ -34,7 +34,7 @@ public class ElasticArticleDto {
 
     public ElasticArticleDto(Integer article_id) {
         this.article_id = article_id;
-        this.nickname = null;
+        this.nick_name = null;
         this.profile_url = null;
         this.title = null;
         this.content = null;

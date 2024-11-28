@@ -99,7 +99,7 @@ public class KafkaStreamsConfig {
                         log.info("이프들어옴");
                         log.info(blogStreamValue.toString());
                         log.info(userTableValue.toString());
-                        return new UserBlogDto(blogStreamValue.getBlog_id(), blogStreamValue.getUser_id(), userTableValue.getNickname(), userTableValue.getProfile_url());
+                        return new UserBlogDto(blogStreamValue.getBlog_id(), blogStreamValue.getUser_id(), userTableValue.getNick_name(), userTableValue.getProfile_url());
                     } else {
                         log.info("엘스로옴");
                         log.info(blogStreamValue.toString());
@@ -151,7 +151,7 @@ public class KafkaStreamsConfig {
                 log.info("아티클이프들어옴");
                 log.info(articleValue.toString());
                 log.info(userblogJoinValue.toString());
-                return new ElasticArticleDto(articleValue.getArticle_id(), userblogJoinValue.getNickname(),
+                return new ElasticArticleDto(articleValue.getArticle_id(), userblogJoinValue.getNick_name(),
                         userblogJoinValue.getProfile_url(), articleValue.getTitle(), articleValue.getContent(), articleValue.getCreated_date(),
                         articleValue.getLike_count(), articleValue.getReply_count(), articleValue.getView_count());
             } else {
@@ -161,7 +161,7 @@ public class KafkaStreamsConfig {
         }).map(((key, value) -> {
             log.info("엘라아티클 셀렉트키 들어옴");
             log.info("바꾸기전 키={}", key);
-            if (value.getNickname() == null && value.getTitle() == null) {
+            if (value.getNick_name() == null && value.getTitle() == null) {
                 return new KeyValue<>("{\"id\":" + value.getArticle_id().toString() + "}", null);
             }
             return new KeyValue<>("{\"id\":" + value.getArticle_id().toString() + "}", value);
