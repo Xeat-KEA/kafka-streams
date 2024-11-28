@@ -189,7 +189,7 @@ public class KafkaStreamsConfig {
             if (value.getArticle_id() == null) {
                 return "{\"id\":" + 1 + "}";
             }
-            return "{\"id\":" + value.getArticle_id().toString() + "}";
+            return "{\"id\":" + value.getArticle_id() + "}";
         })).to(JOINED_TOPIC, Produced.with(Serdes.String(), new JsonSerde<>(CodeArticleDto.class)));
 
         userKtable.toStream().selectKey((key, value) -> "{\"id\":\"" + value.getUser_id() + "\"}")
