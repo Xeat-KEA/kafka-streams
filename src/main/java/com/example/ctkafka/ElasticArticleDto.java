@@ -25,7 +25,7 @@ public class ElasticArticleDto {
         this.nick_name = nick_name;
         this.profile_url = profile_url;
         this.title = title;
-        this.content = content;
+        this.content = content.replaceAll("<img[^>]*>", "");
         this.created_date = Instant.ofEpochMilli(created_date/1000).atZone(ZoneId.of("UTC")).toLocalDateTime().toString();
         this.like_count = like_count;
         this.reply_count = reply_count;
