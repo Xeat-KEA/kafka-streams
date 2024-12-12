@@ -6,6 +6,7 @@ import lombok.Data;
 public class ArticleDto {
     private Integer article_id;
     private Integer blog_id;
+    private Long child_category_id;
     private String title;
     private String content;
     private Long created_date;

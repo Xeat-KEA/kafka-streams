@@ -35,6 +35,7 @@ public class KafkaStreamsConfig {
     public static String BLOG_TOPIC = "ct.blog_service.blog";
     public static String ARTICLE_TOPIC = "ct.blog_service.article";
     public static String CODE_ARTICLE_TOPIC = "ct.blog_service.code_article";
+    public static String CHILD_TOPIC = "ct.blog_service.child_category";
     public static String JOINED_TOPIC = "article";
     public static String ELASTIC_USER_TOPIC = "user";
     public static String REDIS_TOPIC = "ct.llm_service.llm_history";
@@ -119,6 +120,18 @@ public class KafkaStreamsConfig {
         userblogJoin.toStream().selectKey((key, value) -> "{\"id\":" + value.getBlog_id() + "}")
                 .to(ELASTIC_USER_TOPIC, Produced.with(Serdes.String(), new JsonSerde<>(UserBlogDto.class)));
 
+        //CHILD 역직렬화 설정
+        JsonDeserializer<ChildDto> childDtoJsonDeserializer = new JsonDeserializer<>(ChildDto.class);
+        childDtoJsonDeserializer.addTrustedPackages("com.example.*");
+
+        // 스트림 토픽에서 문자열 데이터를 읽어서 KStream으로 변환
+        KTable<String, ChildDto> childKstream = builder.table(
+                CHILD_TOPIC,
+                Consumed.with(
+                        Serdes.String(),
+                        Serdes.serdeFrom(new JsonSerializer<>(), childDtoJsonDeserializer)
+                )
+        );
 
         // article 역직렬화 설정
         JsonDeserializer<ArticleDto> articleDtoJsonDeserializer = new JsonDeserializer<>(ArticleDto.class);
@@ -150,37 +163,44 @@ public class KafkaStreamsConfig {
 
         // 조인된 스트림을 joined 토픽으로 전송
         articleKstream.selectKey(((key, value) -> {
-            log.info("아티클 셀렉트키 들어옴");
-            return "{\"blog_id\":" + value.getBlog_id().toString() + "}";
-        })).join(userblogJoin, (articleValue, userblogJoinValue) -> {
-            log.info("아티클조인들어옴");
-            if (articleValue.get__deleted()) {
-                return new ElasticArticleDto(articleValue.getArticle_id());
-            } else if (articleValue.getBlog_id() == userblogJoinValue.getBlog_id().intValue()) {
-                log.info("아티클이프들어옴");
-                log.info(articleValue.toString());
-                log.info(userblogJoinValue.toString());
-                return new ElasticArticleDto(articleValue.getArticle_id(), userblogJoinValue.getNick_name(),
-                        userblogJoinValue.getProfile_url(), articleValue.getTitle(), articleValue.getContent(), articleValue.getCreated_date(),
-                        articleValue.getLike_count(), articleValue.getReply_count(), articleValue.getView_count());
-            } else {
-                log.info("아티클엘스로옴");
-                return null;
-            }
-        }).map(((key, value) -> {
-            log.info("엘라아티클 셀렉트키 들어옴");
-            log.info("바꾸기전 키={}", key);
-            if (value.getNick_name() == null && value.getTitle() == null) {
-                return new KeyValue<>("{\"id\":" + value.getArticle_id().toString() + "}", null);
-            }
-            return new KeyValue<>("{\"id\":" + value.getArticle_id().toString() + "}", value);
-        })).to(
-                JOINED_TOPIC,
-                Produced.with(
-                        Serdes.String(),
-                        new JsonSerde<>(ElasticArticleDto.class)
-                )
-        );
+                    log.info("아티클 셀렉트키 들어옴");
+                    return "{\"blog_id\":" + value.getBlog_id().toString() + "}";
+                })).join(userblogJoin, (articleValue, userblogJoinValue) -> {
+                    log.info("아티클조인들어옴");
+                    if (articleValue.get__deleted()) {
+                        return new ElasticArticleDto(articleValue.getArticle_id());
+                    } else if (articleValue.getBlog_id() == userblogJoinValue.getBlog_id().intValue()) {
+                        log.info("아티클이프들어옴");
+                        log.info(articleValue.toString());
+                        log.info(userblogJoinValue.toString());
+                        return new ElasticArticleDto(articleValue.getArticle_id(), userblogJoinValue.getNick_name(),
+                                userblogJoinValue.getProfile_url(), articleValue.getTitle(), articleValue.getContent(), articleValue.getCreated_date(),
+                                articleValue.getLike_count(), articleValue.getReply_count(), articleValue.getView_count(), userblogJoinValue.getBlog_id()
+                        );
+                    } else {
+                        log.info("아티클엘스로옴");
+                        return null;
+                    }
+                }).map(((key, value) -> {
+                    log.info("엘라아티클 셀렉트키 들어옴");
+                    log.info("바꾸기전 키={}", key);
+                    if (value.getNick_name() == null && value.getTitle() == null) {
+                        return new KeyValue<>("{\"id\":" + value.getArticle_id().toString() + "}", null);
+                    }
+                    return new KeyValue<>("{\"id\":" + value.getArticle_id().toString() + "}", value);
+                })).join(childKstream, (elasticArticleDto, childDto) -> {
+                    log.info("엘라아티클,차일드조인들어옴");
+                    elasticArticleDto.setChild_category_id(childDto.getChild_category_id());
+                    elasticArticleDto.setParent_category_id(childDto.getParent_category_id());
+                    return elasticArticleDto;
+                })
+                .to(
+                        JOINED_TOPIC,
+                        Produced.with(
+                                Serdes.String(),
+                                new JsonSerde<>(ElasticArticleDto.class)
+                        )
+                );
 
         // code_article 역직렬화 설정
         JsonDeserializer<CodeArticleDto> codeArticleDtoJsonDeserializer = new JsonDeserializer<>(CodeArticleDto.class);

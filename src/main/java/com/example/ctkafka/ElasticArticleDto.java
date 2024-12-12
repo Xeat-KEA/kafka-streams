@@ -18,9 +18,12 @@ public class ElasticArticleDto {
     private Integer like_count;
     private Integer reply_count;
     private Integer view_count;
+    private Long blog_id;
+    private Long child_category_id;
+    private Long parent_category_id;
 
     public ElasticArticleDto(Integer article_id, String nick_name, String profile_url, String title,
-                             String content, Long created_date, Integer like_count, Integer reply_count, Integer view_count) {
+                             String content, Long created_date, Integer like_count, Integer reply_count, Integer view_count, Long blog_id) {
         this.article_id = article_id;
         this.nick_name = nick_name;
         this.profile_url = profile_url;
@@ -30,6 +33,7 @@ public class ElasticArticleDto {
         this.like_count = like_count;
         this.reply_count = reply_count;
         this.view_count = view_count;
+        this.blog_id = blog_id;
     }
 
     public ElasticArticleDto(Integer article_id) {
