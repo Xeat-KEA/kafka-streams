@@ -1,5 +1,7 @@
 package com.example.ctkafka;
 
+import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -11,6 +13,8 @@ import org.apache.kafka.streams.StreamsBuilder;
 import org.apache.kafka.streams.StreamsConfig;
 import org.apache.kafka.streams.errors.LogAndContinueExceptionHandler;
 import org.apache.kafka.streams.kstream.*;
+import org.springframework.ai.document.Document;
+import org.springframework.ai.vectorstore.RedisVectorStore;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -25,6 +29,7 @@ import org.springframework.kafka.support.serializer.JsonSerializer;
 @Slf4j
 @RequiredArgsConstructor
 public class KafkaStreamsConfig {
+    private final RedisVectorStore redisVectorStore;
     public final ObjectMapper objectMapper;
     public static String USER_TOPIC = "ct.user_service.users";
     public static String BLOG_TOPIC = "ct.blog_service.blog";
@@ -32,6 +37,7 @@ public class KafkaStreamsConfig {
     public static String CODE_ARTICLE_TOPIC = "ct.blog_service.code_article";
     public static String JOINED_TOPIC = "article";
     public static String ELASTIC_USER_TOPIC = "user";
+    public static String REDIS_TOPIC = "ct.llm_service.llm_history";
     public String BOOTSTRAP_SERVERS = "localhost:9092";
     public String APPLICATION_ID = "ctKafka2";
 
@@ -194,6 +200,25 @@ public class KafkaStreamsConfig {
 
         userKtable.toStream().selectKey((key, value) -> "{\"id\":\"" + value.getUser_id() + "\"}")
                 .to(ELASTIC_USER_TOPIC, Produced.with(Serdes.String(), new JsonSerde<>(UserDto.class)));
+
+        // LLMHistory 역직렬화 설정
+        JsonDeserializer<LLMHistoryDto> LLMHistoryDtoJsonDeserializer = new JsonDeserializer<>(LLMHistoryDto.class);
+        LLMHistoryDtoJsonDeserializer.addTrustedPackages("com.example.*");
+        // 스트림 토픽에서 문자열 데이터를 읽어서 KStream으로 변환
+        KStream<String, LLMHistoryDto> LLMKstream = builder.stream(
+                REDIS_TOPIC,
+                Consumed.with(
+                        Serdes.String(),
+                        Serdes.serdeFrom(new JsonSerializer<>(), LLMHistoryDtoJsonDeserializer)
+                )
+        );
+        LLMKstream.peek((key, value) -> {
+            List<Document> cdcDocuments = List.of(
+                    new Document(value.getQuestion(), Map.of("type", "question", "chatId", value.getChatId())),
+                    new Document(value.getAnswer(), Map.of("type", "answer", "chatId",value.getChatId()))
+            );
+            redisVectorStore.doAdd(cdcDocuments);
+        });
 
         // 토폴로지를 빌드하여 Kafka Streams 객체 생성
         //3. 스트림즈 생성
