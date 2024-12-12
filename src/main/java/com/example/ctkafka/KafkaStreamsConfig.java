@@ -105,7 +105,7 @@ public class KafkaStreamsConfig {
                         log.info("이프들어옴");
                         log.info(blogStreamValue.toString());
                         log.info(userTableValue.toString());
-                        return new UserBlogDto(blogStreamValue.getBlog_id(), blogStreamValue.getUser_id(), userTableValue.getNick_name(), userTableValue.getProfile_url());
+                        return new UserBlogDto(blogStreamValue.getBlog_id(), blogStreamValue.getUser_id(), userTableValue.getNick_name(), userTableValue.getProfile_url(), userTableValue.getProfile_message());
                     } else {
                         log.info("엘스로옴");
                         log.info(blogStreamValue.toString());
@@ -116,6 +116,9 @@ public class KafkaStreamsConfig {
                     log.info("셀렉트키2들어옴");
                     return "{\"blog_id\":" + value.getBlog_id().toString() + "}";
                 }).toTable(Materialized.with(Serdes.String(), new UserBlogDtoSerde()));
+        userblogJoin.toStream().selectKey((key, value) -> "{\"id\":" + value.getBlog_id() + "}")
+                .to(ELASTIC_USER_TOPIC, Produced.with(Serdes.String(), new JsonSerde<>(UserBlogDto.class)));
+
 
         // article 역직렬화 설정
         JsonDeserializer<ArticleDto> articleDtoJsonDeserializer = new JsonDeserializer<>(ArticleDto.class);
@@ -197,9 +200,6 @@ public class KafkaStreamsConfig {
             }
             return "{\"id\":" + value.getArticle_id() + "}";
         })).to(JOINED_TOPIC, Produced.with(Serdes.String(), new JsonSerde<>(CodeArticleDto.class)));
-
-        userKtable.toStream().selectKey((key, value) -> "{\"id\":\"" + value.getUser_id() + "\"}")
-                .to(ELASTIC_USER_TOPIC, Produced.with(Serdes.String(), new JsonSerde<>(UserDto.class)));
 
         // LLMHistory 역직렬화 설정
         JsonDeserializer<LLMHistoryDto> LLMHistoryDtoJsonDeserializer = new JsonDeserializer<>(LLMHistoryDto.class);
