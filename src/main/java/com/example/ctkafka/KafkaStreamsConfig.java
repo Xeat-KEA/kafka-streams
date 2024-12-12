@@ -184,7 +184,10 @@ public class KafkaStreamsConfig {
                 }).selectKey(((key, value) -> {
                     log.info("엘라아티클 셀렉트키 들어옴");
                     return "{\"child_category_id\":" + value.getChild_category_id().toString() + "}";
-                })).join(childKstream, (elasticArticleDto, childDto) -> {
+                })).repartition(Repartitioned.<String, ElasticArticleDto>as("elastic-article-repartition")
+                        .withKeySerde(Serdes.String())
+                        .withValueSerde(new JsonSerde<>(ElasticArticleDto.class)))
+                .join(childKstream, (elasticArticleDto, childDto) -> {
                     log.info("엘라아티클,차일드조인들어옴");
                     elasticArticleDto.setParent_category_id(childDto.getParent_category_id());
                     return elasticArticleDto;

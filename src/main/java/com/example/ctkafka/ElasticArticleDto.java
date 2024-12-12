@@ -1,13 +1,11 @@
 package com.example.ctkafka;
 
 import lombok.Data;
-import lombok.extern.slf4j.Slf4j;
 
 import java.time.Instant;
 import java.time.ZoneId;
 
 @Data
-@Slf4j
 public class ElasticArticleDto {
     private Integer article_id;
     private String nick_name;
