@@ -48,4 +48,7 @@ public class ElasticArticleDto {
         this.reply_count = null;
         this.view_count = null;
     }
+
+    public ElasticArticleDto() {
+    }
 }
