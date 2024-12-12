@@ -174,26 +174,29 @@ public class KafkaStreamsConfig {
                         log.info(articleValue.toString());
                         log.info(userblogJoinValue.toString());
                         return new ElasticArticleDto(articleValue.getArticle_id(), userblogJoinValue.getNick_name(),
-                                userblogJoinValue.getProfile_url(), articleValue.getTitle(), articleValue.getContent(), articleValue.getCreated_date(),
-                                articleValue.getLike_count(), articleValue.getReply_count(), articleValue.getView_count(), userblogJoinValue.getBlog_id()
-                        );
+                                userblogJoinValue.getProfile_url(), articleValue.getTitle(), articleValue.getContent(),
+                                articleValue.getCreated_date(), articleValue.getLike_count(), articleValue.getReply_count(),
+                                articleValue.getView_count(), userblogJoinValue.getBlog_id(), articleValue.getChild_category_id(), null);
                     } else {
                         log.info("아티클엘스로옴");
                         return null;
                     }
-                }).map(((key, value) -> {
+                }).selectKey(((key, value) -> {
                     log.info("엘라아티클 셀렉트키 들어옴");
+                    return "{\"child_category_id\":" + value.getChild_category_id().toString() + "}";
+                })).join(childKstream, (elasticArticleDto, childDto) -> {
+                    log.info("엘라아티클,차일드조인들어옴");
+                    elasticArticleDto.setParent_category_id(childDto.getParent_category_id());
+                    return elasticArticleDto;
+                })
+                .map(((key, value) -> {
+                    log.info("엘라아티클 셀렉트키2 들어옴");
                     log.info("바꾸기전 키={}", key);
                     if (value.getNick_name() == null && value.getTitle() == null) {
                         return new KeyValue<>("{\"id\":" + value.getArticle_id().toString() + "}", null);
                     }
                     return new KeyValue<>("{\"id\":" + value.getArticle_id().toString() + "}", value);
-                })).join(childKstream, (elasticArticleDto, childDto) -> {
-                    log.info("엘라아티클,차일드조인들어옴");
-                    elasticArticleDto.setChild_category_id(childDto.getChild_category_id());
-                    elasticArticleDto.setParent_category_id(childDto.getParent_category_id());
-                    return elasticArticleDto;
-                })
+                }))
                 .to(
                         JOINED_TOPIC,
                         Produced.with(
