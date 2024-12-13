@@ -240,8 +240,8 @@ public class KafkaStreamsConfig {
         );
         LLMKstream.peek((key, value) -> {
             List<Document> cdcDocuments = List.of(
-                    new Document(value.getQuestion(), Map.of("type", "question", "chatId", value.getChatId())),
-                    new Document(value.getAnswer(), Map.of("type", "answer", "chatId",value.getChatId()))
+                    new Document(value.getQuestion(), Map.of("type", "question", "chatId", value.getChatId(), "chatHistoryId", value.getChatHistoryId())),
+                    new Document(value.getAnswer(), Map.of("type", "answer", "chatId",value.getChatId(), "chatHistoryId", value.getChatHistoryId()))
             );
             redisVectorStore.doAdd(cdcDocuments);
         });
