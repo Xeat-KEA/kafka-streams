@@ -239,11 +239,13 @@ public class KafkaStreamsConfig {
                 )
         );
         LLMKstream.peek((key, value) -> {
-            List<Document> cdcDocuments = List.of(
-                    new Document(value.getQuestion(), Map.of("type", "question", "chatId", value.getChatId(), "chatHistoryId", value.getChatHistoryId())),
-                    new Document(value.getAnswer(), Map.of("type", "answer", "chatId",value.getChatId(), "chatHistoryId", value.getChatHistoryId()))
-            );
-            redisVectorStore.doAdd(cdcDocuments);
+            if (value.getChatId() != null) {
+                List<Document> cdcDocuments = List.of(
+                        new Document(value.getQuestion(), Map.of("type", "question", "chatId", value.getChatId(), "chatHistoryId", value.getChatHistoryId())),
+                        new Document(value.getAnswer(), Map.of("type", "answer", "chatId",value.getChatId(), "chatHistoryId", value.getChatHistoryId()))
+                );
+                redisVectorStore.doAdd(cdcDocuments);
+            }
         });
 
         // 토폴로지를 빌드하여 Kafka Streams 객체 생성
