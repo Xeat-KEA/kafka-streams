@@ -183,7 +183,10 @@ public class KafkaStreamsConfig {
                     }
                 }).selectKey(((key, value) -> {
                     log.info("엘라아티클 셀렉트키 들어옴");
-                    return "{\"child_category_id\":" + value.getChild_category_id().toString() + "}";
+                    if (value.getChild_category_id() != null) {
+                        return "{\"child_category_id\":" + value.getChild_category_id().toString() + "}";
+                    }
+                    return "{\"child_category_id\":0}";
                 })).repartition(Repartitioned.<String, ElasticArticleDto>as("elastic-article-repartition")
                         .withKeySerde(Serdes.String())
                         .withValueSerde(new JsonSerde<>(ElasticArticleDto.class)))
